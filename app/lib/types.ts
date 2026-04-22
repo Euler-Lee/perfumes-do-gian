@@ -3,6 +3,7 @@ export type Categoria = {
   nome: string;
   descricao: string | null;
   ordem: number;
+  imagem_url: string | null;
   criado_em: string;
 };
 
@@ -19,6 +20,12 @@ export type Perfume = {
   preco: number;
   estoque: number;
   destaque: boolean;
+  score_casual:  number;
+  score_formal:  number;
+  score_aberto:  number;
+  score_fechado: number;
+  inspiracao: string | null;
+  foto_url:   string | null;
   criado_em: string;
   categorias?: Categoria;
   usos?: PerfumeUso[];

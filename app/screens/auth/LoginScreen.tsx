@@ -26,21 +26,29 @@ export default function LoginScreen({ navigation }: any) {
 
   async function handleGoogle() {
     setGLoading(true);
-    const redirectTo = makeRedirectUri({ scheme: 'pdg', path: 'auth-callback' });
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo, skipBrowserRedirect: true },
-    });
-    if (error || !data?.url) {
-      Alert.alert('Google indisponivel', 'Configure o Google OAuth no Supabase Dashboard para usar este recurso.');
+    try {
+      const redirectTo = makeRedirectUri({ scheme: 'pdg' });
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo, skipBrowserRedirect: true },
+      });
+      if (error) throw error;
+      if (!data?.url) throw new Error('URL OAuth nao retornada pelo Supabase');
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      if (result.type === 'success' && result.url) {
+        const { error: sessionError } = await supabase.auth.exchangeCodeForSession(result.url);
+        if (sessionError) throw sessionError;
+      } else if (result.type === 'cancel') {
+        // usuario fechou o browser — sem ação necessaria
+        console.log('[Google OAuth] browser fechado pelo usuario');
+      }
+    } catch (err: any) {
+      console.error('[Google OAuth] erro:', err);
+      Alert.alert('Erro no login com Google', err?.message ?? 'Tente novamente.');
+    } finally {
       setGLoading(false);
-      return;
     }
-    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-    if (result.type === 'success' && result.url) {
-      await supabase.auth.exchangeCodeForSession(result.url);
-    }
-    setGLoading(false);
   }
 
   return (

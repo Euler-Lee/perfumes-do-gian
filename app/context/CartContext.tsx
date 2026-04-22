@@ -35,27 +35,52 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { refresh(); }, []);
 
   const addItem = useCallback(async (perfumeId: string) => {
-    const existing = items.find(i => i.perfume_id === perfumeId);
-    if (existing) {
-      await supabase.from('carrinho').update({ quantidade: existing.quantidade + 1 }).eq('id', existing.id);
-    } else {
-      await supabase.from('carrinho').insert({ perfume_id: perfumeId, quantidade: 1 });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { console.warn('[Cart] addItem: no session'); return; }
+
+      const existing = items.find(i => i.perfume_id === perfumeId);
+      if (existing) {
+        const { error } = await supabase
+          .from('carrinho')
+          .update({ quantidade: existing.quantidade + 1 })
+          .eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('carrinho')
+          .insert({ perfume_id: perfumeId, quantidade: 1, user_id: session.user.id });
+        if (error) throw error;
+      }
+      await refresh();
+    } catch (err) {
+      console.error('[Cart] addItem error:', err);
     }
-    await refresh();
   }, [items, refresh]);
 
   const removeItem = useCallback(async (itemId: string) => {
-    await supabase.from('carrinho').delete().eq('id', itemId);
-    await refresh();
+    try {
+      const { error } = await supabase.from('carrinho').delete().eq('id', itemId);
+      if (error) throw error;
+      await refresh();
+    } catch (err) {
+      console.error('[Cart] removeItem error:', err);
+    }
   }, [refresh]);
 
   const updateQuantidade = useCallback(async (itemId: string, quantidade: number) => {
-    if (quantidade <= 0) {
-      await supabase.from('carrinho').delete().eq('id', itemId);
-    } else {
-      await supabase.from('carrinho').update({ quantidade }).eq('id', itemId);
+    try {
+      if (quantidade <= 0) {
+        const { error } = await supabase.from('carrinho').delete().eq('id', itemId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('carrinho').update({ quantidade }).eq('id', itemId);
+        if (error) throw error;
+      }
+      await refresh();
+    } catch (err) {
+      console.error('[Cart] updateQuantidade error:', err);
     }
-    await refresh();
   }, [refresh]);
 
   const clearCart = useCallback(async () => {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Image, Linking, Dimensions,
+  Image, Linking, Dimensions, ImageBackground,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
 import ClockLoader from '../components/ClockLoader';
@@ -51,11 +51,19 @@ export default function HomeScreen({ navigation }: any) {
               params: { categoriaId: cat.id, categoriaNome: cat.nome },
             })}
           >
-            <Text style={s.catNome}>{cat.nome}</Text>
-            {cat.descricao && (
-              <Text style={s.catDesc} numberOfLines={2}>{cat.descricao}</Text>
-            )}
-            <Text style={s.catSeta}>›</Text>
+            <ImageBackground
+              source={cat.imagem_url ? { uri: cat.imagem_url } : undefined}
+              style={s.catCardInner}
+              imageStyle={{ borderRadius: radius.lg }}
+            >
+              <View style={s.catOverlay}>
+                <Text style={s.catNome}>{cat.nome}</Text>
+                {cat.descricao && (
+                  <Text style={s.catDesc} numberOfLines={2}>{cat.descricao}</Text>
+                )}
+                <Text style={s.catSeta}>›</Text>
+              </View>
+            </ImageBackground>
           </TouchableOpacity>
         ))}
       </View>
@@ -119,13 +127,23 @@ const s = StyleSheet.create({
   grid:    { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: space[4], gap: space[3] },
   catCard: {
     width: CARD_W,
+    borderRadius: radius.lg,
+    minHeight: 130,
+    overflow: 'hidden',
+    ...shadow.sm,
+  },
+  catCardInner: {
+    flex: 1,
+    minHeight: 130,
     backgroundColor: colors.primary,
     borderRadius: radius.lg,
+    justifyContent: 'space-between',
+  },
+  catOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(27,36,56,0.65)',
+    borderRadius: radius.lg,
     padding: space[4],
-    borderWidth: 1,
-    borderColor: colors.goldBorder,
-    ...shadow.sm,
-    minHeight: 110,
     justifyContent: 'space-between',
   },
   catNome:  { fontSize: fontSize.base, fontWeight: fontWeight.heavy, color: '#FFFFFF', lineHeight: 22 },
