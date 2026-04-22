@@ -1,0 +1,16 @@
+# Configuração do Supabase CLI para o projeto Perfumes do Gian
+project_id = "rwcexacwuzryttekgppk"
+
+[api]
+port = 54321
+
+[db]
+port = 54322
+
+[studio]
+port = 54323
+
+[auth]
+site_url = "http://localhost:3000"
+jwt_expiry = 3600
+enable_signup = true
