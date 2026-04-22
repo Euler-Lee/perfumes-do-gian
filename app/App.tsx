@@ -140,10 +140,14 @@ function AppRoot() {
       console.log('[Deep Link] recebido:', url);
       try {
         // PKCE flow: URL tem ?code=...
+        // exchangeCodeForSession espera APENAS o code, nao a URL inteira
         if (url.includes('code=')) {
-          const { error } = await supabase.auth.exchangeCodeForSession(url);
-          if (error) console.error('[Deep Link] exchangeCodeForSession error:', error);
-          else console.log('[Deep Link] sessao trocada com sucesso');
+          const code = url.match(/[?&]code=([^&#]+)/)?.[1];
+          if (code) {
+            const { error } = await supabase.auth.exchangeCodeForSession(code);
+            if (error) console.error('[Deep Link] exchangeCodeForSession error:', error);
+            else console.log('[Deep Link] sessao trocada com sucesso');
+          }
         }
         // Implicit flow: URL tem #access_token=... (fallback)
         else if (url.includes('access_token=')) {

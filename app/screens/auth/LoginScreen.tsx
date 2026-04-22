@@ -54,9 +54,13 @@ export default function LoginScreen({ navigation }: any) {
 
       if (result.type === 'success' && result.url) {
         // iOS / alguns Androids: resultado direto no browser
-        console.log('[Google OAuth] exchanging code from result.url');
-        const { error: ex } = await supabase.auth.exchangeCodeForSession(result.url);
-        if (ex) throw ex;
+        // exchangeCodeForSession espera APENAS o code, nao a URL inteira
+        const code = result.url.match(/[?&]code=([^&#]+)/)?.[1];
+        console.log('[Google OAuth] code extraido:', code ? 'ok' : 'vazio');
+        if (code) {
+          const { error: ex } = await supabase.auth.exchangeCodeForSession(code);
+          if (ex) throw ex;
+        }
       }
       // Se result.type === 'dismiss': Android entregou via deep link
       // O handler em App.tsx chama exchangeCodeForSession automaticamente
