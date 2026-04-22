@@ -1,8 +1,9 @@
 import React, { useCallback, useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, ActivityIndicator, Linking,
+  ActivityIndicator, Linking,
 } from "react-native";
+import ConfirmDialog from "../../components/ConfirmDialog";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../../lib/supabase";
@@ -43,6 +44,7 @@ export default function ContaScreen() {
   const [membroDesde, setMembroDesde] = useState("");
   const [pedidos,     setPedidos]     = useState<Pedido[]>([]);
   const [loading,     setLoading]     = useState(true);
+  const [confirmSair, setConfirmSair] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,14 +82,7 @@ export default function ContaScreen() {
   const pedidosAtivos = pedidos.filter(p => p.status !== "entregue" && p.status !== "cancelado").length;
 
   function sair() {
-    Alert.alert(
-      "Sair da conta",
-      "Tem certeza que deseja sair?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Sair", style: "destructive", onPress: () => supabase.auth.signOut() },
-      ],
-    );
+    setConfirmSair(true);
   }
 
   if (loading) {
@@ -97,6 +92,16 @@ export default function ContaScreen() {
   const iniciais = nomeDisplay.split(" ").slice(0, 2).map((n: string) => n[0]).join("").toUpperCase();
 
   return (
+    <>
+    <ConfirmDialog
+      visible={confirmSair}
+      title="Sair da conta"
+      message="Tem certeza que deseja encerrar sua sessão?"
+      confirmLabel="Sair"
+      confirmDanger
+      onConfirm={() => { setConfirmSair(false); supabase.auth.signOut(); }}
+      onCancel={() => setConfirmSair(false)}
+    />
     <ScrollView style={s.root} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
 
       {/* Perfil */}
@@ -235,6 +240,7 @@ export default function ContaScreen() {
 
       <View style={{ height: 40 }} />
     </ScrollView>
+    </>
   );
 }
 

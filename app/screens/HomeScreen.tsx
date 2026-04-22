@@ -1,30 +1,87 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Image, Linking, Dimensions, ImageBackground,
+  Image, Linking, Dimensions, FlatList,
 } from 'react-native';
 import { supabase } from '../lib/supabase';
-import ClockLoader from '../components/ClockLoader';
+import FragranceLoader from '../components/FragranceLoader';
 import { colors, fontSize, fontWeight, radius, shadow, space } from '../lib/theme';
-import type { Categoria } from '../lib/types';
+import type { Perfume } from '../lib/types';
 
 const { width: SW } = Dimensions.get('window');
-const CARD_W = (SW - space[4] * 2 - space[3]) / 2;
 
 const WHATSAPP_NUM = '5541988859797';
 
+// Cards fixos de categoria — destaques visuais com gradiente/cor sólida
+const CAT_CARDS = [
+  {
+    id: 'arabe',
+    nome: 'Árabes',
+    sub: 'Oud, ambar e especiarias do oriente',
+    cor: '#3D1F0A',
+    accent: '#D4956A',
+    emoji: '🕌',
+  },
+  {
+    id: 'importado',
+    nome: 'Importados',
+    sub: 'Alta perfumaria europeia e americana',
+    cor: '#1B2438',
+    accent: '#C8A951',
+    emoji: '✈️',
+  },
+  {
+    id: 'masculino',
+    nome: 'Masculinos',
+    sub: 'Madeiras, couro e notas frescas',
+    cor: '#1A3028',
+    accent: '#4CAF7D',
+    emoji: '🌲',
+  },
+  {
+    id: 'feminino',
+    nome: 'Femininos',
+    sub: 'Florais, frutados e almiscarados',
+    cor: '#3D1530',
+    accent: '#E17BB3',
+    emoji: '🌸',
+  },
+  {
+    id: 'unissex',
+    nome: 'Unissex',
+    sub: 'Para todos os estilos e ocasiões',
+    cor: '#1C2540',
+    accent: '#7B9CDF',
+    emoji: '⚡',
+  },
+  {
+    id: 'exclusivo',
+    nome: 'Exclusivos',
+    sub: 'Seleção especial curada pelo Gian',
+    cor: '#2D1B00',
+    accent: '#FFD700',
+    emoji: '👑',
+  },
+];
+
 export default function HomeScreen({ navigation }: any) {
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [loading,    setLoading]    = useState(true);
+  const [destaques, setDestaques] = useState<Perfume[]>([]);
+  const [loading,   setLoading]   = useState(true);
 
   useEffect(() => {
-    supabase.from('categorias').select('*').order('ordem').then(({ data }) => {
-      setCategorias((data as Categoria[]) ?? []);
-      setLoading(false);
-    });
+    supabase
+      .from('perfumes')
+      .select('*')
+      .eq('destaque', true)
+      .order('criado_em', { ascending: false })
+      .limit(10)
+      .then(({ data }) => {
+        setDestaques((data as Perfume[]) ?? []);
+        setLoading(false);
+      });
   }, []);
 
-  if (loading) return <ClockLoader label="Carregando catálogo" />;
+  if (loading) return <FragranceLoader label="Carregando" />;
 
   return (
     <ScrollView style={s.root} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
@@ -41,32 +98,61 @@ export default function HomeScreen({ navigation }: any) {
       {/* Categorias */}
       <Text style={s.secTitle}>CATEGORIAS</Text>
       <View style={s.grid}>
-        {categorias.map(cat => (
+        {CAT_CARDS.map(cat => (
           <TouchableOpacity
             key={cat.id}
-            style={s.catCard}
+            style={[s.catCard, { backgroundColor: cat.cor }]}
             activeOpacity={0.85}
             onPress={() => navigation.navigate('PerfumesTab', {
               screen: 'PerfumesList',
-              params: { categoriaId: cat.id, categoriaNome: cat.nome },
+              params: { tipo: cat.id },
             })}
           >
-            <ImageBackground
-              source={cat.imagem_url ? { uri: cat.imagem_url } : undefined}
-              style={s.catCardInner}
-              imageStyle={{ borderRadius: radius.lg }}
-            >
-              <View style={s.catOverlay}>
-                <Text style={s.catNome}>{cat.nome}</Text>
-                {cat.descricao && (
-                  <Text style={s.catDesc} numberOfLines={2}>{cat.descricao}</Text>
-                )}
-                <Text style={s.catSeta}>›</Text>
-              </View>
-            </ImageBackground>
+            <Text style={s.catEmoji}>{cat.emoji}</Text>
+            <Text style={[s.catNome, { color: cat.accent }]}>{cat.nome}</Text>
+            <Text style={s.catDesc}>{cat.sub}</Text>
+            <Text style={[s.catSeta, { color: cat.accent }]}>›</Text>
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Destaques */}
+      {destaques.length > 0 && (
+        <>
+          <Text style={s.secTitle}>EM DESTAQUE</Text>
+          <FlatList
+            data={destaques}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={p => p.id}
+            contentContainerStyle={s.destaquesRow}
+            renderItem={({ item: p }) => (
+              <TouchableOpacity
+                style={s.destaqueCard}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('PerfumesTab', {
+                  screen: 'PerfumeDetalhe',
+                  params: { perfumeId: p.id },
+                })}
+              >
+                <View style={[s.destaqueImgWrap, p.tipo === 'arabe' ? s.destaqueImgArabe : s.destaqueImgImportado]}>
+                  {p.foto_url
+                    ? <Image source={{ uri: p.foto_url }} style={s.destaqueImg} resizeMode="cover" />
+                    : <Text style={s.destaqueEmoji}>{p.tipo === 'arabe' ? '🕌' : '✈️'}</Text>
+                  }
+                </View>
+                <View style={{ flex: 1, padding: 10 }}>
+                  <Text style={s.destaqueNome} numberOfLines={2}>{p.nome}</Text>
+                  <Text style={s.destaqueMarca} numberOfLines={1}>{p.marca}</Text>
+                  <Text style={s.destaquePreco}>
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(p.preco))}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
+        </>
+      )}
 
       {/* WhatsApp card */}
       <TouchableOpacity
@@ -76,7 +162,7 @@ export default function HomeScreen({ navigation }: any) {
       >
         <View style={s.waLeft}>
           <Text style={s.waTitle}>Não encontrou o que precisa?</Text>
-          <Text style={s.waSub}>Nos chame no WhatsApp</Text>
+          <Text style={s.waSub}>Fale com o Gian pelo WhatsApp</Text>
         </View>
         <View style={s.waBtn}>
           <Text style={s.waBtnTxt}>Chamar</Text>
@@ -86,6 +172,8 @@ export default function HomeScreen({ navigation }: any) {
     </ScrollView>
   );
 }
+
+const CARD_W = (SW - space[4] * 2 - space[3]) / 2;
 
 const s = StyleSheet.create({
   root:    { flex: 1, backgroundColor: colors.bg },
@@ -128,27 +216,31 @@ const s = StyleSheet.create({
   catCard: {
     width: CARD_W,
     borderRadius: radius.lg,
-    minHeight: 130,
-    overflow: 'hidden',
-    ...shadow.sm,
-  },
-  catCardInner: {
-    flex: 1,
-    minHeight: 130,
-    backgroundColor: colors.primary,
-    borderRadius: radius.lg,
-    justifyContent: 'space-between',
-  },
-  catOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(27,36,56,0.65)',
-    borderRadius: radius.lg,
+    minHeight: 140,
     padding: space[4],
     justifyContent: 'space-between',
+    ...shadow.sm,
   },
-  catNome:  { fontSize: fontSize.base, fontWeight: fontWeight.heavy, color: '#FFFFFF', lineHeight: 22 },
-  catDesc:  { fontSize: fontSize.xs, color: '#9AAABB', marginTop: 6, lineHeight: 17 },
-  catSeta:  { fontSize: 22, color: colors.gold, fontWeight: fontWeight.bold, marginTop: 8, alignSelf: 'flex-end' },
+  catEmoji: { fontSize: 26, marginBottom: 6 },
+  catNome:  { fontSize: fontSize.base, fontWeight: fontWeight.heavy, lineHeight: 20 },
+  catDesc:  { fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 4, lineHeight: 15, flexShrink: 1 },
+  catSeta:  { fontSize: 22, fontWeight: fontWeight.bold, marginTop: 6, alignSelf: 'flex-end' },
+
+  // Destaques horizontal
+  destaquesRow: { paddingHorizontal: space[4], gap: space[3] },
+  destaqueCard: {
+    width: 160, backgroundColor: colors.surface,
+    borderRadius: radius.lg, overflow: 'hidden',
+    borderWidth: 1, borderColor: colors.border, ...shadow.sm,
+  },
+  destaqueImgWrap:     { height: 120, justifyContent: 'center', alignItems: 'center' },
+  destaqueImgArabe:    { backgroundColor: colors.arabeBg },
+  destaqueImgImportado:{ backgroundColor: colors.importadoBg },
+  destaqueImg:  { width: '100%', height: '100%' },
+  destaqueEmoji:{ fontSize: 44 },
+  destaqueNome: { fontSize: fontSize.sm, fontWeight: fontWeight.heavy, color: colors.text1, lineHeight: 18 },
+  destaqueMarca:{ fontSize: fontSize.xs, color: colors.text3, marginTop: 2 },
+  destaquePreco:{ fontSize: fontSize.sm, fontWeight: fontWeight.black, color: colors.gold, marginTop: 6 },
 
   waCard: {
     flexDirection: 'row', alignItems: 'center',

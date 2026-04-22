@@ -1,3 +1,3 @@
-// GoldLoader é alias para ClockLoader
-export { default } from './ClockLoader';
+// GoldLoader é alias para FragranceLoader
+export { default } from './FragranceLoader';
 
