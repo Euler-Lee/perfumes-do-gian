@@ -134,27 +134,17 @@ function AppRoot() {
       setSession(session);
     });
 
-    // Deep link handler para OAuth callbacks (Android entrega via Linking)
+    // Deep link handler para OAuth callbacks (implicit flow — tokens no fragment)
     const handleUrl = async (url: string) => {
       if (!url || !url.startsWith('pdg://')) return;
-      console.log('[Deep Link] recebido:', url);
-      try {
-        // PKCE flow: URL tem ?code=...
-        // exchangeCodeForSession espera APENAS o code, nao a URL inteira
-        if (url.includes('code=')) {
-          const code = url.match(/[?&]code=([^&#]+)/)?.[1];
-          if (code) {
-            const { error } = await supabase.auth.exchangeCodeForSession(code);
-            if (error) console.error('[Deep Link] exchangeCodeForSession error:', error);
-            else console.log('[Deep Link] sessao trocada com sucesso');
-          }
-        }
-        // Implicit flow: URL tem #access_token=... (fallback)
-        else if (url.includes('access_token=')) {
-          await supabase.auth.getSession();
-        }
-      } catch (err) {
-        console.error('[Deep Link] erro:', err);
+      // Implicit flow: access_token no fragment (#) — Android preserva o fragment no Intent
+      const fragment = url.includes('#') ? url.split('#')[1] : null;
+      const query    = url.includes('?') ? url.split('?')[1] : null;
+      const params   = new URLSearchParams(fragment ?? query ?? '');
+      const access_token  = params.get('access_token');
+      const refresh_token = params.get('refresh_token');
+      if (access_token && refresh_token) {
+        await supabase.auth.setSession({ access_token, refresh_token });
       }
     };
     const linkSub = Linking.addEventListener('url', ({ url }) => handleUrl(url));
