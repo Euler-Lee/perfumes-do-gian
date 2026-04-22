@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
+  Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image,
 } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import { colors, fontSize, fontWeight, radius } from '../../lib/theme';
@@ -13,14 +13,14 @@ export default function SignupScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
 
   async function handleSignup() {
-    if (!email.trim() || !senha) { Alert.alert('Preencha todos os campos.'); return; }
-    if (senha !== conf)           { Alert.alert('As senhas não conferem.'); return; }
-    if (senha.length < 6)         { Alert.alert('A senha precisa ter ao menos 6 caracteres.'); return; }
+    if (!email.trim() || !senha) { Alert.alert('Campos obrigatórios', 'Preencha e-mail e senha.'); return; }
+    if (senha !== conf)           { Alert.alert('Atenção', 'As senhas não conferem.'); return; }
+    if (senha.length < 6)         { Alert.alert('Atenção', 'A senha deve ter no mínimo 6 caracteres.'); return; }
     setLoading(true);
     const { error } = await supabase.auth.signUp({ email: email.trim(), password: senha });
     setLoading(false);
-    if (error) { Alert.alert('Erro', error.message); return; }
-    Alert.alert('Conta criada!', 'Verifique seu e-mail para confirmar o cadastro.');
+    if (error) { Alert.alert('Erro ao criar conta', error.message); return; }
+    Alert.alert('Conta criada!', 'Verifique seu e-mail para confirmar o cadastro e depois faça login.');
     navigation.navigate('Login');
   }
 
@@ -29,7 +29,7 @@ export default function SignupScreen({ navigation }: any) {
       <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled">
 
         <View style={s.header}>
-          <Text style={s.logo}>🫙</Text>
+          <Image source={require('../../assets/gian.png')} style={s.logo} resizeMode="cover" />
           <Text style={s.brand}>Perfumes do Gian</Text>
         </View>
 
@@ -77,7 +77,7 @@ const s = StyleSheet.create({
   root:      { flex: 1, backgroundColor: colors.primary },
   container: { flexGrow: 1, justifyContent: 'center', padding: 28 },
   header:    { alignItems: 'center', marginBottom: 32 },
-  logo:      { fontSize: 56, marginBottom: 10 },
+  logo:      { width: 72, height: 72, borderRadius: 36, marginBottom: 14, borderWidth: 2, borderColor: colors.goldBorder },
   brand:     { fontSize: fontSize.xl, fontWeight: fontWeight.black, color: colors.goldLight },
   card: {
     backgroundColor: colors.surface, borderRadius: radius.xl,

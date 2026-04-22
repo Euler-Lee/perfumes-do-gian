@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image,
@@ -16,8 +16,19 @@ export default function LoginScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [gLoading,setGLoading]= useState(false);
 
+  // Quando a sessão for criada (via deep link no Android), para o loading
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') setGLoading(false);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   async function handleLogin() {
-    if (!email.trim() || !senha) { Alert.alert('Preencha e-mail e senha.'); return; }
+    if (!email.trim() || !senha) {
+      Alert.alert('Campos obrigatórios', 'Preencha e-mail e senha.');
+      return;
+    }
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: senha });
     setLoading(false);
@@ -27,26 +38,33 @@ export default function LoginScreen({ navigation }: any) {
   async function handleGoogle() {
     setGLoading(true);
     try {
-      const redirectTo = makeRedirectUri({ scheme: 'pdg' });
+      // path garante URL com host válido: pdg://auth-callback
+      const redirectTo = makeRedirectUri({ scheme: 'pdg', path: 'auth-callback' });
+      console.log('[Google OAuth] redirectTo:', redirectTo);
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo, skipBrowserRedirect: true },
       });
       if (error) throw error;
-      if (!data?.url) throw new Error('URL OAuth nao retornada pelo Supabase');
+      if (!data?.url) throw new Error('URL OAuth não retornada pelo Supabase');
 
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+      console.log('[Google OAuth] result.type:', result.type);
+
       if (result.type === 'success' && result.url) {
-        const { error: sessionError } = await supabase.auth.exchangeCodeForSession(result.url);
-        if (sessionError) throw sessionError;
-      } else if (result.type === 'cancel') {
-        // usuario fechou o browser — sem ação necessaria
-        console.log('[Google OAuth] browser fechado pelo usuario');
+        // iOS / alguns Androids: resultado direto no browser
+        console.log('[Google OAuth] exchanging code from result.url');
+        const { error: ex } = await supabase.auth.exchangeCodeForSession(result.url);
+        if (ex) throw ex;
       }
+      // Se result.type === 'dismiss': Android entregou via deep link
+      // O handler em App.tsx chama exchangeCodeForSession automaticamente
+      // O useEffect acima vai setar gLoading=false quando SIGNED_IN disparar
+
     } catch (err: any) {
       console.error('[Google OAuth] erro:', err);
-      Alert.alert('Erro no login com Google', err?.message ?? 'Tente novamente.');
-    } finally {
+      Alert.alert('Erro no login', err?.message ?? 'Tente novamente.');
       setGLoading(false);
     }
   }

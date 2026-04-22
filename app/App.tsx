@@ -134,10 +134,23 @@ function AppRoot() {
       setSession(session);
     });
 
-    // Deep link handler para OAuth callbacks
+    // Deep link handler para OAuth callbacks (Android entrega via Linking)
     const handleUrl = async (url: string) => {
-      if (url && (url.startsWith('pdg://') || url.includes('auth-callback'))) {
-        await supabase.auth.exchangeCodeForSession(url);
+      if (!url || !url.startsWith('pdg://')) return;
+      console.log('[Deep Link] recebido:', url);
+      try {
+        // PKCE flow: URL tem ?code=...
+        if (url.includes('code=')) {
+          const { error } = await supabase.auth.exchangeCodeForSession(url);
+          if (error) console.error('[Deep Link] exchangeCodeForSession error:', error);
+          else console.log('[Deep Link] sessao trocada com sucesso');
+        }
+        // Implicit flow: URL tem #access_token=... (fallback)
+        else if (url.includes('access_token=')) {
+          await supabase.auth.getSession();
+        }
+      } catch (err) {
+        console.error('[Deep Link] erro:', err);
       }
     };
     const linkSub = Linking.addEventListener('url', ({ url }) => handleUrl(url));
