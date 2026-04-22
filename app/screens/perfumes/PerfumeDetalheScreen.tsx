@@ -1,93 +1,37 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Animated,
-} from 'react-native';
-import { supabase } from '../../lib/supabase';
-import { colors, fontSize, fontWeight, radius, shadow, space } from '../../lib/theme';
-import { AMBIENTES } from '../../lib/types';
-import type { Perfume, PerfumeUso } from '../../lib/types';
+  StyleSheet, ActivityIndicator,
+} from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
+import { supabase } from "../../lib/supabase";
+import { colors, fontSize, fontWeight, radius, shadow, space } from "../../lib/theme";
+import { useCart } from "../../context/CartContext";
+import type { Perfume } from "../../lib/types";
 
 type Props = { route: any; navigation: any };
 
-// ── Barra animada de uso ─────────────────────────────────────────
-function BarraUso({ ambiente, percentual, cor, delay }: { ambiente: string; percentual: number; cor: string; delay: number }) {
-  const width = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(width, {
-      toValue: percentual,
-      duration: 700,
-      delay,
-      useNativeDriver: false,
-    }).start();
-  }, [percentual]);
-
-  const amb = AMBIENTES.find(a => a.key === ambiente);
-
-  return (
-    <View style={b.row}>
-      <View style={b.labelWrap}>
-        <Text style={b.icon}>{amb?.icon ?? '🫙'}</Text>
-        <Text style={b.label} numberOfLines={1}>{amb?.label ?? ambiente}</Text>
-      </View>
-      <View style={b.barBg}>
-        <Animated.View
-          style={[
-            b.barFill,
-            {
-              backgroundColor: cor,
-              width: width.interpolate({
-                inputRange: [0, 100],
-                outputRange: ['0%', '100%'],
-                extrapolate: 'clamp',
-              }),
-            },
-          ]}
-        />
-      </View>
-      <Text style={[b.pct, { color: cor }]}>{percentual.toFixed(0)}%</Text>
-    </View>
-  );
-}
-
-const b = StyleSheet.create({
-  row:       { flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 10 },
-  labelWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, width: 160 },
-  icon:      { fontSize: 16 },
-  label:     { fontSize: fontSize.sm, color: colors.text1, fontWeight: fontWeight.semibold, flex: 1 },
-  barBg:     { flex: 1, height: 10, backgroundColor: colors.border, borderRadius: radius.full, overflow: 'hidden' },
-  barFill:   { height: '100%', borderRadius: radius.full },
-  pct:       { width: 38, textAlign: 'right', fontSize: fontSize.sm, fontWeight: fontWeight.bold },
-});
-
-// ── Tela principal ────────────────────────────────────────────────
 export default function PerfumeDetalheScreen({ route, navigation }: Props) {
   const perfumeId   = route.params?.perfumeId   as string;
   const perfumeNome = route.params?.perfumeNome as string;
 
   const [perfume, setPerfume] = useState<Perfume | null>(null);
-  const [usos,    setUsos]    = useState<PerfumeUso[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const { addItem, items } = useCart();
+  const itemCart = items.find(i => i.perfume_id === perfumeId);
+
   useEffect(() => {
-    navigation.setOptions({ title: perfumeNome ?? 'Perfume' });
-    async function load() {
-      const [{ data: p }, { data: u }] = await Promise.all([
-        supabase.from('perfumes').select('*, categorias(nome)').eq('id', perfumeId).single(),
-        supabase.from('usos_perfume').select('*').eq('perfume_id', perfumeId).order('percentual', { ascending: false }),
-      ]);
-      setPerfume(p as Perfume);
-      setUsos((u as PerfumeUso[]) ?? []);
-      setLoading(false);
-    }
-    load();
+    navigation.setOptions({ title: perfumeNome ?? "Perfume" });
+    supabase.from("perfumes").select("*, categorias(nome)").eq("id", perfumeId).single()
+      .then(({ data }) => { setPerfume(data as Perfume); setLoading(false); });
   }, [perfumeId]);
 
   if (loading) return <View style={s.center}><ActivityIndicator color={colors.gold} size="large" /></View>;
   if (!perfume) return null;
 
-  const tipoArabe = perfume.tipo === 'arabe';
+  const tipoArabe = perfume.tipo === "arabe";
+  const estoqueOk = (perfume.estoque ?? 0) > 0;
 
   return (
     <ScrollView style={s.root} contentContainerStyle={s.content}>
@@ -95,7 +39,9 @@ export default function PerfumeDetalheScreen({ route, navigation }: Props) {
       {/* Header card */}
       <View style={s.headerCard}>
         <View style={[s.tipoPill, tipoArabe ? s.tipoArabe : s.tipoImportado]}>
-          <Text style={s.tipoPillTxt}>{tipoArabe ? '🪔 Árabe / Inspirado' : '✈️ Importado'}</Text>
+          <Text style={[s.tipoPillTxt, tipoArabe ? s.tipoArabeTxt : s.tipoImportadoTxt]}>
+            {tipoArabe ? "ARABE / INSPIRADO" : "IMPORTADO"}
+          </Text>
         </View>
         <Text style={s.nomeTxt}>{perfume.nome}</Text>
         {perfume.marca && <Text style={s.marcaTxt}>{perfume.marca}</Text>}
@@ -113,11 +59,11 @@ export default function PerfumeDetalheScreen({ route, navigation }: Props) {
         </View>
 
         {perfume.preco != null && (
-          <Text style={s.preco}>R$ {Number(perfume.preco).toFixed(2).replace('.', ',')}</Text>
+          <Text style={s.preco}>R$ {Number(perfume.preco).toFixed(2).replace(".", ",")}</Text>
         )}
 
         {(perfume as any).categorias?.nome && (
-          <Text style={s.catTag}>🗂️ {(perfume as any).categorias.nome}</Text>
+          <Text style={s.catTag}>{(perfume as any).categorias.nome}</Text>
         )}
 
         {perfume.descricao ? (
@@ -125,53 +71,30 @@ export default function PerfumeDetalheScreen({ route, navigation }: Props) {
         ) : null}
       </View>
 
-      {/* Gráfico de uso por ambiente */}
-      {usos.length > 0 && (
-        <View style={s.chartCard}>
-          <Text style={s.chartTitle}>📊 Uso por Ambiente</Text>
-          <Text style={s.chartSub}>Índice de adequação para cada ocasião</Text>
-          <View style={s.chartArea}>
-            {usos.map((u, i) => {
-              const amb = AMBIENTES.find(a => a.key === u.ambiente);
-              return (
-                <BarraUso
-                  key={u.id}
-                  ambiente={u.ambiente}
-                  percentual={u.percentual}
-                  cor={amb?.cor ?? colors.gold}
-                  delay={i * 80}
-                />
-              );
-            })}
-          </View>
-
-          {/* Legenda do melhor uso */}
-          {usos[0] && (
-            <View style={s.destaque}>
-              <Text style={s.destaqueIcon}>🏆</Text>
-              <View>
-                <Text style={s.destaqueTit}>Melhor para</Text>
-                <Text style={s.destaqueSub}>
-                  {AMBIENTES.find(a => a.key === usos[0].ambiente)?.label ?? usos[0].ambiente}
-                  {' '}({usos[0].percentual.toFixed(0)}%)
-                </Text>
-              </View>
-            </View>
-          )}
+      {/* Estoque */}
+      {perfume.estoque != null && (
+        <View style={[s.estoqueCard, !estoqueOk && s.estoqueCardOut]}>
+          <MaterialIcons name={estoqueOk ? "check-circle" : "remove-circle"} size={20} color={estoqueOk ? "#27AE60" : colors.danger} />
+          <Text style={[s.estoqueTxt, !estoqueOk && { color: colors.danger }]}>
+            {!estoqueOk ? "Fora de estoque" : perfume.estoque! < 5 ? `Ultimo estoque: ${perfume.estoque} unidades` : `${perfume.estoque} unidades disponiveis`}
+          </Text>
         </View>
       )}
 
-      {usos.length === 0 && (
-        <View style={s.semUsos}>
-          <Text style={s.semUsosTxt}>Nenhum índice de uso cadastrado.</Text>
-          <Text style={s.semUsosSub}>Edite o perfume para adicionar.</Text>
-        </View>
+      {/* Botao carrinho */}
+      {estoqueOk && (
+        itemCart ? (
+          <TouchableOpacity style={s.btnCart} onPress={() => navigation.navigate("CarrinhoTab")} activeOpacity={0.85}>
+            <MaterialIcons name="shopping-bag" size={22} color={colors.primary} />
+            <Text style={s.btnCartTxt}>Ver Carrinho ({itemCart.quantidade}x)</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={s.btnAdd} onPress={() => addItem(perfumeId)} activeOpacity={0.85}>
+            <MaterialIcons name="add-shopping-cart" size={22} color={colors.goldLight} />
+            <Text style={s.btnAddTxt}>Adicionar ao Carrinho</Text>
+          </TouchableOpacity>
+        )
       )}
-
-      {/* Botão editar */}
-      <TouchableOpacity style={s.editBtn} onPress={() => navigation.navigate('PerfumeForm', { id: perfume.id })}>
-        <Text style={s.editBtnTxt}>✏️  Editar este perfume</Text>
-      </TouchableOpacity>
 
     </ScrollView>
   );
@@ -180,58 +103,50 @@ export default function PerfumeDetalheScreen({ route, navigation }: Props) {
 const s = StyleSheet.create({
   root:    { flex: 1, backgroundColor: colors.bg },
   content: { padding: space[4], paddingBottom: 48 },
-  center:  { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  center:  { flex: 1, justifyContent: "center", alignItems: "center" },
 
   headerCard: {
     backgroundColor: colors.primary, borderRadius: radius.xl,
     padding: space[6], marginBottom: space[4],
-    borderWidth: 1, borderColor: colors.goldBorder, ...shadow.md,
+    borderWidth: 1, borderColor: colors.goldBorder,
   },
   tipoPill: {
-    alignSelf: 'flex-start', paddingVertical: 4, paddingHorizontal: 12,
+    alignSelf: "flex-start", paddingVertical: 4, paddingHorizontal: 12,
     borderRadius: radius.full, marginBottom: 12,
   },
-  tipoArabe:      { backgroundColor: colors.arabeBg },
-  tipoImportado:  { backgroundColor: colors.importadoBg },
-  tipoPillTxt:    { fontSize: fontSize.xs, fontWeight: fontWeight.bold, color: colors.text1 },
-  nomeTxt:        { fontSize: fontSize.xl, fontWeight: fontWeight.black, color: '#FFFFFF', marginBottom: 4 },
-  marcaTxt:       { fontSize: fontSize.base, color: colors.goldLight, marginBottom: 12 },
-  detalhesRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  badge:          { paddingVertical: 4, paddingHorizontal: 10, borderRadius: radius.full, backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(200,169,81,0.4)' },
-  badgeTxt:       { fontSize: fontSize.xs, color: colors.goldLight, fontWeight: fontWeight.semibold },
-  preco:          { fontSize: fontSize.lg, fontWeight: fontWeight.heavy, color: colors.goldLight, marginBottom: 8 },
-  catTag:         { fontSize: fontSize.sm, color: '#A0A8B8', marginBottom: 10 },
-  descricao:      { fontSize: fontSize.sm, color: '#C8D0DC', lineHeight: 20, marginTop: 8, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.1)', paddingTop: 12 },
+  tipoArabe:        { backgroundColor: colors.arabeBg },
+  tipoImportado:    { backgroundColor: colors.importadoBg },
+  tipoPillTxt:      { fontSize: fontSize.xs, fontWeight: fontWeight.bold },
+  tipoArabeTxt:     { color: "#7B4A00" },
+  tipoImportadoTxt: { color: "#004488" },
+  nomeTxt:      { fontSize: fontSize.xl, fontWeight: fontWeight.black, color: "#FFFFFF", marginBottom: 4 },
+  marcaTxt:     { fontSize: fontSize.base, color: colors.goldLight, marginBottom: 12 },
+  detalhesRow:  { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
+  badge:        { paddingVertical: 4, paddingHorizontal: 10, borderRadius: radius.full, backgroundColor: "rgba(255,255,255,0.12)", borderWidth: 1, borderColor: "rgba(200,169,81,0.4)" },
+  badgeTxt:     { fontSize: fontSize.xs, color: colors.goldLight, fontWeight: fontWeight.semibold },
+  preco:        { fontSize: fontSize.lg, fontWeight: fontWeight.heavy, color: colors.goldLight, marginBottom: 8 },
+  catTag:       { fontSize: fontSize.sm, color: "#A0A8B8", marginBottom: 10 },
+  descricao:    { fontSize: fontSize.sm, color: "#C8D0DC", lineHeight: 20, marginTop: 8, borderTopWidth: 1, borderColor: "rgba(255,255,255,0.1)", paddingTop: 12 },
 
-  chartCard: {
-    backgroundColor: colors.surface, borderRadius: radius.xl,
-    padding: space[5], marginBottom: space[4],
-    borderWidth: 1, borderColor: colors.border, ...shadow.sm,
+  estoqueCard: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: "#EAF9EE", borderRadius: radius.md, padding: 14,
+    borderWidth: 1, borderColor: "#A8E6BA", marginBottom: space[3],
   },
-  chartTitle: { fontSize: fontSize.md, fontWeight: fontWeight.heavy, color: colors.primary, marginBottom: 4 },
-  chartSub:   { fontSize: fontSize.sm, color: colors.text3, marginBottom: 20 },
-  chartArea:  { marginBottom: 8 },
+  estoqueCardOut: { backgroundColor: "#FDECEC", borderColor: "#F5B7B1" },
+  estoqueTxt: { fontSize: fontSize.sm, fontWeight: fontWeight.semibold, color: "#27AE60" },
 
-  destaque: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: colors.goldBg, borderRadius: radius.md, padding: 14,
-    borderWidth: 1, borderColor: colors.goldBorder, marginTop: 8,
+  btnAdd: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+    backgroundColor: colors.primary, borderRadius: radius.md,
+    padding: 18, borderWidth: 1.5, borderColor: colors.gold, marginBottom: space[3],
   },
-  destaqueIcon: { fontSize: 28 },
-  destaqueTit:  { fontSize: fontSize.xs, color: colors.text3, fontWeight: fontWeight.semibold, textTransform: 'uppercase' },
-  destaqueSub:  { fontSize: fontSize.base, color: colors.primary, fontWeight: fontWeight.bold, marginTop: 2 },
+  btnAddTxt: { color: colors.goldLight, fontSize: fontSize.base, fontWeight: fontWeight.bold },
 
-  semUsos: {
-    backgroundColor: colors.surface, borderRadius: radius.lg,
-    padding: space[5], alignItems: 'center',
-    borderWidth: 1, borderColor: colors.border, marginBottom: space[4],
+  btnCart: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+    backgroundColor: colors.gold, borderRadius: radius.md,
+    padding: 18, marginBottom: space[3],
   },
-  semUsosTxt: { fontSize: fontSize.base, color: colors.text2, fontWeight: fontWeight.semibold },
-  semUsosSub: { fontSize: fontSize.sm, color: colors.text3, marginTop: 4 },
-
-  editBtn: {
-    backgroundColor: 'transparent', borderRadius: radius.md, padding: 16,
-    alignItems: 'center', borderWidth: 1.5, borderColor: colors.gold,
-  },
-  editBtnTxt: { color: colors.gold, fontSize: fontSize.base, fontWeight: fontWeight.bold },
+  btnCartTxt: { color: colors.primary, fontSize: fontSize.base, fontWeight: fontWeight.bold },
 });

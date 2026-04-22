@@ -1,16 +1,15 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View, Text, FlatList, TouchableOpacity,
   StyleSheet, TextInput, RefreshControl,
-} from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import * as Haptics from 'expo-haptics';
-import { supabase } from '../../lib/supabase';
-import GoldLoader from '../../components/GoldLoader';
-import GoldBackground from '../../components/GoldBackground';
-import ConfirmDialog from '../../components/ConfirmDialog';
-import { colors, fontSize, fontWeight, radius, shadow, space } from '../../lib/theme';
-import type { Perfume } from '../../lib/types';
+} from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import { MaterialIcons } from "@expo/vector-icons";
+import { supabase } from "../../lib/supabase";
+import GoldLoader from "../../components/GoldLoader";
+import { colors, fontSize, fontWeight, radius, shadow, space } from "../../lib/theme";
+import { useCart } from "../../context/CartContext";
+import type { Perfume } from "../../lib/types";
 
 type Props = { route: any; navigation: any };
 
@@ -21,21 +20,23 @@ export default function PerfumesListScreen({ route, navigation }: Props) {
   const [perfumes,   setPerfumes]   = useState<Perfume[]>([]);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [confirmId,  setConfirmId]  = useState<string | null>(null);
-  const [busca,      setBusca]      = useState('');
-  const [filtroTipo, setFiltroTipo] = useState<'todos' | 'arabe' | 'importado'>('todos');
+  const [busca,      setBusca]      = useState("");
+  const [filtroTipo, setFiltroTipo] = useState<"todos" | "arabe" | "importado">("todos");
+
+  const { addItem, items } = useCart();
+  const inCart = useMemo(() => new Set(items.map(i => i.perfume_id)), [items]);
 
   const filtrados = useMemo(() => perfumes.filter(p => {
     const matchBusca = p.nome.toLowerCase().includes(busca.toLowerCase()) ||
-      (p.marca ?? '').toLowerCase().includes(busca.toLowerCase());
-    const matchTipo = filtroTipo === 'todos' || p.tipo === filtroTipo;
+      (p.marca ?? "").toLowerCase().includes(busca.toLowerCase());
+    const matchTipo = filtroTipo === "todos" || p.tipo === filtroTipo;
     return matchBusca && matchTipo;
   }), [perfumes, busca, filtroTipo]);
 
   const load = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from('perfumes').select('*, categorias(nome)').order('nome');
-    if (categoriaId) query = query.eq('categoria_id', categoriaId);
+    let query = supabase.from("perfumes").select("*, categorias(nome)").order("nome");
+    if (categoriaId) query = query.eq("categoria_id", categoriaId);
     const { data } = await query;
     setPerfumes((data as Perfume[]) ?? []);
     setLoading(false);
@@ -43,24 +44,22 @@ export default function PerfumesListScreen({ route, navigation }: Props) {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    let query = supabase.from('perfumes').select('*, categorias(nome)').order('nome');
-    if (categoriaId) query = query.eq('categoria_id', categoriaId);
+    let query = supabase.from("perfumes").select("*, categorias(nome)").order("nome");
+    if (categoriaId) query = query.eq("categoria_id", categoriaId);
     const { data } = await query;
     setPerfumes((data as Perfume[]) ?? []);
     setRefreshing(false);
   }, [categoriaId]);
 
-  useFocusEffect(load);
-
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if (categoriaNome) navigation.setOptions({ title: categoriaNome });
-  }, [categoriaNome]);
+    load();
+  }, [load, categoriaNome]));
 
   if (loading) return <GoldLoader />;
 
   return (
     <View style={s.root}>
-      <GoldBackground opacity={0.03} />
       <View style={s.searchWrap}>
         <TextInput
           style={s.search} value={busca} onChangeText={setBusca}
@@ -68,18 +67,15 @@ export default function PerfumesListScreen({ route, navigation }: Props) {
           clearButtonMode="while-editing"
         />
       </View>
-
-      {/* Filtro tipo */}
       <View style={s.filtros}>
-        {(['todos', 'arabe', 'importado'] as const).map(t => (
+        {(["todos", "arabe", "importado"] as const).map(t => (
           <TouchableOpacity key={t} style={[s.filtroBtn, filtroTipo === t && s.filtroBtnSel]} onPress={() => setFiltroTipo(t)}>
             <Text style={[s.filtroTxt, filtroTipo === t && s.filtroTxtSel]}>
-              {t === 'todos' ? 'Todos' : t === 'arabe' ? '🪔 Árabe' : '✈️ Importado'}
+              {t === "todos" ? "Todos" : t === "arabe" ? "ARABE" : "IMPORTADO"}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
-
       <FlatList
         data={filtrados}
         keyExtractor={i => i.id}
@@ -87,66 +83,51 @@ export default function PerfumesListScreen({ route, navigation }: Props) {
         contentContainerStyle={filtrados.length === 0 ? s.emptyContainer : s.list}
         ListEmptyComponent={
           <View style={s.emptyWrap}>
-            <Text style={s.emptyIcon}>🫙</Text>
-            <Text style={s.emptyTitle}>{busca ? 'Nenhum resultado' : 'Nenhum perfume'}</Text>
-            <Text style={s.emptySub}>{busca ? `Sem resultados para "${busca}"` : 'Adicione seu primeiro perfume.'}</Text>
+            <MaterialIcons name="spa" size={52} color={colors.border} />
+            <Text style={s.emptyTitle}>{busca ? "Nenhum resultado" : "Nenhum perfume"}</Text>
+            <Text style={s.emptySub}>{busca ? `Sem resultados para "${busca}"` : "Catalogo em breve."}</Text>
           </View>
         }
         renderItem={({ item }) => (
-          <View style={s.card}>
-            <TouchableOpacity
-              style={s.cardContent}
-              activeOpacity={0.8}
-              onPress={() => { Haptics.selectionAsync(); navigation.navigate('PerfumeDetalhe', { perfumeId: item.id, perfumeNome: item.nome }); }}
-            >
-              <View style={[s.tipoBadge, item.tipo === 'arabe' ? s.tipoArabe : s.tipoImportado]}>
-                <Text style={s.tipoTxt}>{item.tipo === 'arabe' ? '🪔' : '✈️'}</Text>
+          <TouchableOpacity
+            style={s.card}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate("PerfumeDetalhe", { perfumeId: item.id, perfumeNome: item.nome })}
+          >
+            <View style={s.cardLeft}>
+              <View style={[s.tipoBadge, item.tipo === "arabe" ? s.tipoArabe : s.tipoImportado]}>
+                <Text style={[s.tipoTxt, item.tipo === "arabe" ? s.tipoArabeTxt : s.tipoImportadoTxt]}>
+                  {item.tipo === "arabe" ? "ARABE" : "IMPORT."}
+                </Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.nome}>{item.nome}</Text>
-                <View style={s.metaRow}>
-                  {item.marca    && <Text style={s.meta}>{item.marca}</Text>}
-                  {item.concentracao && <Text style={s.metaSep}>·</Text>}
-                  {item.concentracao && <Text style={s.meta}>{item.concentracao}</Text>}
-                </View>
-                {(item as any).categorias?.nome && (
-                  <Text style={s.catTag}>{(item as any).categorias.nome}</Text>
-                )}
+              <Text style={s.nome} numberOfLines={2}>{item.nome}</Text>
+              <View style={s.metaRow}>
+                {item.marca && <Text style={s.meta}>{item.marca}</Text>}
+                {item.concentracao && <Text style={s.metaSep}> - </Text>}
+                {item.concentracao && <Text style={s.meta}>{item.concentracao}</Text>}
               </View>
-              {item.preco != null && (
-                <Text style={s.preco}>R$ {Number(item.preco).toFixed(2).replace('.', ',')}</Text>
+              {(item as any).categorias?.nome && (
+                <Text style={s.catTag}>{(item as any).categorias.nome}</Text>
               )}
-            </TouchableOpacity>
-            <View style={s.actions}>
-              <TouchableOpacity style={s.editBtn} onPress={() => { Haptics.selectionAsync(); navigation.navigate('PerfumeForm', { id: item.id }); }}>
-                <Text style={s.editTxt}>✏️</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.deleteBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setConfirmId(item.id); }}>
-                <Text style={s.deleteTxt}>✕</Text>
+            </View>
+            <View style={s.cardRight}>
+              {item.preco != null && (
+                <Text style={s.preco}>R$ {Number(item.preco).toFixed(2).replace(".", ",")}</Text>
+              )}
+              <TouchableOpacity
+                style={[s.addBtn, inCart.has(item.id) && s.addBtnSel]}
+                onPress={() => addItem(item.id)}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons
+                  name={inCart.has(item.id) ? "check" : "add-shopping-cart"}
+                  size={18}
+                  color={inCart.has(item.id) ? colors.primary : colors.goldLight}
+                />
               </TouchableOpacity>
             </View>
-          </View>
+          </TouchableOpacity>
         )}
-      />
-
-      <TouchableOpacity
-        style={s.fab}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); navigation.navigate('PerfumeForm', categoriaId ? { categoriaId } : undefined); }}
-      >
-        <Text style={s.fabText}>+ Novo Perfume</Text>
-      </TouchableOpacity>
-
-      <ConfirmDialog
-        visible={confirmId !== null}
-        title="Excluir perfume"
-        message="Esta ação não pode ser desfeita."
-        onConfirm={async () => {
-          if (!confirmId) return;
-          await supabase.from('perfumes').delete().eq('id', confirmId);
-          setConfirmId(null);
-          load();
-        }}
-        onCancel={() => setConfirmId(null)}
       />
     </View>
   );
@@ -154,49 +135,46 @@ export default function PerfumesListScreen({ route, navigation }: Props) {
 
 const s = StyleSheet.create({
   root:           { flex: 1, backgroundColor: colors.bg },
-  list:           { padding: space[4], paddingBottom: 90 },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: space[10] },
-  emptyWrap:      { alignItems: 'center', paddingHorizontal: 32 },
-  emptyIcon:      { fontSize: 52, marginBottom: 16 },
-  emptyTitle:     { fontSize: fontSize.md, fontWeight: fontWeight.bold, color: colors.text1, marginBottom: 8, textAlign: 'center' },
-  emptySub:       { fontSize: fontSize.sm, color: colors.text2, textAlign: 'center', lineHeight: 22 },
+  list:           { padding: space[4], paddingBottom: 24 },
+  emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", padding: space[10] },
+  emptyWrap:      { alignItems: "center", paddingHorizontal: 32, gap: 12 },
+  emptyTitle:     { fontSize: fontSize.md, fontWeight: fontWeight.bold, color: colors.text1, textAlign: "center" },
+  emptySub:       { fontSize: fontSize.sm, color: colors.text2, textAlign: "center", lineHeight: 22 },
   searchWrap:     { paddingHorizontal: space[4], paddingTop: space[3], paddingBottom: space[2] },
   search: {
     backgroundColor: colors.surface, borderRadius: radius.md,
     borderWidth: 1, borderColor: colors.border,
     paddingHorizontal: 14, paddingVertical: 10,
-    fontSize: fontSize.base, color: colors.text1, ...shadow.xs,
+    fontSize: fontSize.base, color: colors.text1,
   },
-  filtros:      { flexDirection: 'row', paddingHorizontal: space[4], gap: 8, marginBottom: 4 },
+  filtros:      { flexDirection: "row", paddingHorizontal: space[4], gap: 8, marginBottom: 4 },
   filtroBtn:    { paddingVertical: 7, paddingHorizontal: 14, borderRadius: radius.full, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
   filtroBtnSel: { backgroundColor: colors.primary, borderColor: colors.gold },
   filtroTxt:    { fontSize: fontSize.sm, color: colors.text2, fontWeight: fontWeight.semibold },
   filtroTxtSel: { color: colors.goldLight },
   card: {
     backgroundColor: colors.surface, borderRadius: radius.md, marginBottom: space[3],
-    flexDirection: 'row', alignItems: 'stretch',
-    borderWidth: 1, borderColor: colors.border, ...shadow.xs,
+    flexDirection: "row", alignItems: "center",
+    borderWidth: 1, borderColor: colors.border,
+    padding: space[4], gap: 12,
   },
-  cardContent: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: space[4], gap: 12 },
-  tipoBadge:   { width: 40, height: 40, borderRadius: radius.sm, justifyContent: 'center', alignItems: 'center' },
-  tipoArabe:   { backgroundColor: colors.arabeBg },
-  tipoImportado: { backgroundColor: colors.importadoBg },
-  tipoTxt:     { fontSize: 20 },
-  nome:        { fontSize: fontSize.base, fontWeight: fontWeight.bold, color: colors.text1 },
-  metaRow:     { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  meta:        { fontSize: fontSize.sm, color: colors.text2 },
-  metaSep:     { fontSize: fontSize.sm, color: colors.text3 },
-  catTag:      { fontSize: fontSize.xs, color: colors.gold, fontWeight: fontWeight.semibold, marginTop: 3 },
-  preco:       { fontSize: fontSize.sm, fontWeight: fontWeight.bold, color: colors.primary },
-  actions:     { flexDirection: 'column' },
-  editBtn:     { flex: 1, width: 48, justifyContent: 'center', alignItems: 'center' },
-  editTxt:     { fontSize: 16 },
-  deleteBtn:   { flex: 1, width: 48, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.dangerBg, borderTopRightRadius: radius.md, borderBottomRightRadius: radius.md },
-  deleteTxt:   { color: colors.danger, fontWeight: fontWeight.bold, fontSize: 13 },
-  fab: {
-    margin: space[4], backgroundColor: colors.primary, borderRadius: radius.md,
-    padding: space[4], alignItems: 'center', ...shadow.sm,
-    borderWidth: 1, borderColor: colors.gold,
+  cardLeft:  { flex: 1, gap: 4 },
+  cardRight: { alignItems: "flex-end", gap: 10 },
+  tipoBadge: { alignSelf: "flex-start", paddingVertical: 3, paddingHorizontal: 8, borderRadius: radius.full },
+  tipoArabe:        { backgroundColor: colors.arabeBg },
+  tipoImportado:    { backgroundColor: colors.importadoBg },
+  tipoTxt:          { fontSize: 9, fontWeight: "900", letterSpacing: 0.5 },
+  tipoArabeTxt:     { color: "#7B4A00" },
+  tipoImportadoTxt: { color: "#004488" },
+  nome:    { fontSize: fontSize.base, fontWeight: fontWeight.bold, color: colors.text1 },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  meta:    { fontSize: fontSize.sm, color: colors.text2 },
+  metaSep: { fontSize: fontSize.sm, color: colors.text3 },
+  catTag:  { fontSize: fontSize.xs, color: colors.gold, fontWeight: fontWeight.semibold },
+  preco:   { fontSize: fontSize.sm, fontWeight: fontWeight.bold, color: colors.primary },
+  addBtn: {
+    width: 38, height: 38, borderRadius: radius.sm, backgroundColor: colors.primary,
+    justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: colors.gold,
   },
-  fabText: { color: colors.goldLight, fontSize: fontSize.base, fontWeight: fontWeight.bold },
+  addBtnSel: { backgroundColor: colors.gold },
 });

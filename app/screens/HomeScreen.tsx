@@ -1,93 +1,78 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import {
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  Image, Linking, Dimensions,
+} from 'react-native';
 import { supabase } from '../lib/supabase';
+import ClockLoader from '../components/ClockLoader';
 import { colors, fontSize, fontWeight, radius, shadow, space } from '../lib/theme';
+import type { Categoria } from '../lib/types';
+
+const { width: SW } = Dimensions.get('window');
+const CARD_W = (SW - space[4] * 2 - space[3]) / 2;
+
+const WHATSAPP_NUM = '5541988859797';
 
 export default function HomeScreen({ navigation }: any) {
-  const [stats, setStats] = useState({ total: 0, arabes: 0, importados: 0, categorias: 0 });
-  const [loading, setLoading] = useState(true);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [loading,    setLoading]    = useState(true);
 
   useEffect(() => {
-    async function load() {
-      const [
-        { count: total },
-        { count: arabes },
-        { count: importados },
-        { count: categorias },
-      ] = await Promise.all([
-        supabase.from('perfumes').select('*', { count: 'exact', head: true }),
-        supabase.from('perfumes').select('*', { count: 'exact', head: true }).eq('tipo', 'arabe'),
-        supabase.from('perfumes').select('*', { count: 'exact', head: true }).eq('tipo', 'importado'),
-        supabase.from('categorias').select('*', { count: 'exact', head: true }),
-      ]);
-      setStats({ total: total ?? 0, arabes: arabes ?? 0, importados: importados ?? 0, categorias: categorias ?? 0 });
+    supabase.from('categorias').select('*').order('ordem').then(({ data }) => {
+      setCategorias((data as Categoria[]) ?? []);
       setLoading(false);
-    }
-    load();
+    });
   }, []);
 
-  return (
-    <ScrollView style={s.root} contentContainerStyle={s.content}>
+  if (loading) return <ClockLoader label="Carregando catálogo" />;
 
-      {/* Cabeçalho */}
-      <View style={s.header}>
-        <Text style={s.headerIcon}>🫙</Text>
-        <Text style={s.headerTitle}>Perfumes do Gian</Text>
-        <Text style={s.headerSub}>Seu acervo de fragrâncias</Text>
+  return (
+    <ScrollView style={s.root} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+
+      {/* Hero */}
+      <View style={s.hero}>
+        <Image source={require('../assets/gian.png')} style={s.heroImg} resizeMode="cover" />
+        <View style={s.heroOverlay}>
+          <Text style={s.heroLabel}>PERFUMES DO GIAN</Text>
+          <Text style={s.heroPhrase}>Que experiência{'\n'}vamos escolher hoje?</Text>
+        </View>
       </View>
 
-      {/* Cards de estatísticas */}
-      {loading ? (
-        <ActivityIndicator color={colors.gold} style={{ marginVertical: 32 }} />
-      ) : (
-        <View style={s.statsGrid}>
-          <View style={[s.statCard, s.statTotal]}>
-            <Text style={s.statNum}>{stats.total}</Text>
-            <Text style={s.statLbl}>Perfumes</Text>
-          </View>
-          <View style={[s.statCard, s.statArabe]}>
-            <Text style={s.statNum}>{stats.arabes}</Text>
-            <Text style={s.statLbl}>🪔 Árabes</Text>
-          </View>
-          <View style={[s.statCard, s.statImportado]}>
-            <Text style={s.statNum}>{stats.importados}</Text>
-            <Text style={s.statLbl}>✈️ Importados</Text>
-          </View>
-          <View style={[s.statCard, s.statCat]}>
-            <Text style={s.statNum}>{stats.categorias}</Text>
-            <Text style={s.statLbl}>Categorias</Text>
-          </View>
-        </View>
-      )}
+      {/* Categorias */}
+      <Text style={s.secTitle}>CATEGORIAS</Text>
+      <View style={s.grid}>
+        {categorias.map(cat => (
+          <TouchableOpacity
+            key={cat.id}
+            style={s.catCard}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('PerfumesTab', {
+              screen: 'PerfumesList',
+              params: { categoriaId: cat.id, categoriaNome: cat.nome },
+            })}
+          >
+            <Text style={s.catNome}>{cat.nome}</Text>
+            {cat.descricao && (
+              <Text style={s.catDesc} numberOfLines={2}>{cat.descricao}</Text>
+            )}
+            <Text style={s.catSeta}>›</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-      {/* Ações rápidas */}
-      <Text style={s.secTitle}>Acesso rápido</Text>
-
-      <TouchableOpacity style={s.actionCard} onPress={() => navigation.navigate('CategoriasTab')}>
-        <Text style={s.actionIcon}>🗂️</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={s.actionTitle}>Categorias</Text>
-          <Text style={s.actionSub}>Explore por família olfativa</Text>
+      {/* WhatsApp card */}
+      <TouchableOpacity
+        style={s.waCard}
+        activeOpacity={0.85}
+        onPress={() => Linking.openURL(`https://wa.me/${WHATSAPP_NUM}`)}
+      >
+        <View style={s.waLeft}>
+          <Text style={s.waTitle}>Não encontrou o que precisa?</Text>
+          <Text style={s.waSub}>Nos chame no WhatsApp</Text>
         </View>
-        <Text style={s.arrow}>›</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={s.actionCard} onPress={() => navigation.navigate('PerfumesTab')}>
-        <Text style={s.actionIcon}>🫙</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={s.actionTitle}>Todos os Perfumes</Text>
-          <Text style={s.actionSub}>Árabe e importados juntos</Text>
+        <View style={s.waBtn}>
+          <Text style={s.waBtnTxt}>Chamar</Text>
         </View>
-        <Text style={s.arrow}>›</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={s.actionCard} onPress={() => navigation.navigate('ColecaoTab')}>
-        <Text style={s.actionIcon}>💎</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={s.actionTitle}>Minha Coleção</Text>
-          <Text style={s.actionSub}>Perfumes que você tem ou quer</Text>
-        </View>
-        <Text style={s.arrow}>›</Text>
       </TouchableOpacity>
 
     </ScrollView>
@@ -96,35 +81,70 @@ export default function HomeScreen({ navigation }: any) {
 
 const s = StyleSheet.create({
   root:    { flex: 1, backgroundColor: colors.bg },
-  content: { padding: space[4], paddingBottom: 48 },
+  content: { paddingBottom: 32 },
 
-  header: {
-    backgroundColor: colors.primary, borderRadius: radius.xl,
-    padding: 28, alignItems: 'center', marginBottom: space[5],
-    borderWidth: 1, borderColor: colors.goldBorder, ...shadow.md,
+  hero: { width: '100%', height: 260, position: 'relative' },
+  heroImg: { width: '100%', height: '100%' },
+  heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(27,36,56,0.55)',
+    justifyContent: 'flex-end',
+    padding: space[5],
   },
-  headerIcon:  { fontSize: 52, marginBottom: 10 },
-  headerTitle: { fontSize: fontSize.xl, fontWeight: fontWeight.black, color: '#fff', letterSpacing: 0.5 },
-  headerSub:   { fontSize: fontSize.sm, color: colors.goldLight, marginTop: 4 },
-
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: space[5] },
-  statCard:  { flex: 1, minWidth: '44%', borderRadius: radius.lg, padding: 18, alignItems: 'center', borderWidth: 1, ...shadow.xs },
-  statTotal: { backgroundColor: colors.primary, borderColor: colors.goldBorder },
-  statArabe: { backgroundColor: colors.arabeBg,  borderColor: colors.arabeBorder },
-  statImportado: { backgroundColor: colors.importadoBg, borderColor: colors.importadoBorder },
-  statCat:   { backgroundColor: colors.goldBg,   borderColor: colors.goldBorder },
-  statNum:   { fontSize: fontSize.xxl, fontWeight: fontWeight.black, color: colors.goldLight },
-  statLbl:   { fontSize: fontSize.sm, color: colors.goldLight, marginTop: 4, fontWeight: fontWeight.semibold },
-
-  secTitle: { fontSize: fontSize.md, fontWeight: fontWeight.heavy, color: colors.primary, marginBottom: 12 },
-
-  actionCard: {
-    backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border,
-    flexDirection: 'row', alignItems: 'center', padding: space[4], marginBottom: 10,
-    gap: 14, ...shadow.xs,
+  heroLabel: {
+    fontSize: fontSize.xs,
+    color: colors.goldLight,
+    fontWeight: fontWeight.bold,
+    letterSpacing: 3,
+    marginBottom: 8,
   },
-  actionIcon:  { fontSize: 28 },
-  actionTitle: { fontSize: fontSize.base, fontWeight: fontWeight.bold, color: colors.text1 },
-  actionSub:   { fontSize: fontSize.sm, color: colors.text3, marginTop: 2 },
-  arrow:       { fontSize: 22, color: colors.gold, fontWeight: fontWeight.bold },
+  heroPhrase: {
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.black,
+    color: '#FFFFFF',
+    lineHeight: 32,
+    letterSpacing: 0.3,
+  },
+
+  secTitle: {
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.bold,
+    color: colors.text3,
+    letterSpacing: 2.5,
+    marginTop: space[5],
+    marginBottom: 14,
+    marginHorizontal: space[4],
+  },
+
+  grid:    { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: space[4], gap: space[3] },
+  catCard: {
+    width: CARD_W,
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    padding: space[4],
+    borderWidth: 1,
+    borderColor: colors.goldBorder,
+    ...shadow.sm,
+    minHeight: 110,
+    justifyContent: 'space-between',
+  },
+  catNome:  { fontSize: fontSize.base, fontWeight: fontWeight.heavy, color: '#FFFFFF', lineHeight: 22 },
+  catDesc:  { fontSize: fontSize.xs, color: '#9AAABB', marginTop: 6, lineHeight: 17 },
+  catSeta:  { fontSize: 22, color: colors.gold, fontWeight: fontWeight.bold, marginTop: 8, alignSelf: 'flex-end' },
+
+  waCard: {
+    flexDirection: 'row', alignItems: 'center',
+    margin: space[4], marginTop: space[5],
+    backgroundColor: '#075E54',
+    borderRadius: radius.lg,
+    padding: space[4],
+    gap: 12,
+    ...shadow.sm,
+  },
+  waLeft:   { flex: 1 },
+  waTitle:  { fontSize: fontSize.base, fontWeight: fontWeight.bold, color: '#FFFFFF' },
+  waSub:    { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.75)', marginTop: 3 },
+  waBtn:    { backgroundColor: '#25D366', borderRadius: radius.md, paddingHorizontal: 16, paddingVertical: 10 },
+  waBtnTxt: { color: '#FFFFFF', fontWeight: fontWeight.bold, fontSize: fontSize.sm },
 });
+
