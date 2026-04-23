@@ -9,10 +9,16 @@ export const colors = {
   goldBg:      '#FBF6E8',
   goldBorder:  '#DFC880',
 
-  // Backgrounds
-  bg:      '#F5F1EB', // pergaminho quente
-  surface: '#FFFFFF',
-  card:    '#FDFBF7',
+  // Âmbar
+  amber:       '#C47A2B', // âmbar quente
+  amberLight:  '#E8A24A', // âmbar claro
+  amberBg:     '#FFF4DC', // fundo âmbar suave
+  amberBorder: '#DFBA7A', // borda âmbar
+
+  // Backgrounds — âmbar quente
+  bg:      '#F4E9D0', // pergaminho âmbar
+  surface: '#FFFBF0', // creme
+  card:    '#FDF5E4', // card âmbar claro
 
   // Textos
   text1: '#1B2438',
@@ -31,7 +37,7 @@ export const colors = {
 
   // Tipos
   arabe:          '#7B4F2E',
-  arabeBg:        '#FBF0E6',
+  arabeBg:        '#F9ECD8',
   arabeBorder:    '#D4956A',
   importado:      '#1B2438',
   importadoBg:    '#EEF1F8',
